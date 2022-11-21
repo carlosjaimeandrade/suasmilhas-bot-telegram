@@ -3,16 +3,12 @@ import { Telegraf } from "telegraf";
 import dotenv from 'dotenv';
 dotenv.config();
 
-import {
-    getCia,
-    getCias,
-    getQuoteHotmilhas,
-    getQuoteMaxmilhas
-} from "./controllers/QuoteController";
-
-import { ICompany } from "./interfaces/ICompany";
+import { getCia, getCias, getQuoteHotmilhas, getQuoteMaxmilhas } from "./controllers/QuoteController";
 import { getUser, isRegistered } from "./controllers/UserController";
 import { getService } from "./controllers/ServiceController";
+
+import { ICompany } from "./interfaces/ICompany";
+import { IServices } from "./interfaces/IServices";
 
 const bot = new Telegraf(process.env.BOT_TOKEN as string);
 
@@ -21,6 +17,7 @@ bot.start(async (context) => {
         const from = context.update.message.from;
 
         await isRegistered(context.update.message.from);
+        console.log(context.update.message.from);
 
         context.replyWithHTML(`
         Olá <b>${from.first_name}</b>! \n@SuasMilhasBot é o mais completo bot com cotações em tempo real das principais plaformas de venda de milhas do país!
@@ -405,7 +402,7 @@ bot.command('recarregar', async (context) => {
     context.replyWithHTML(`💵 Forma de pagamento: <b>PIX</b>
     \nPara dar início a sua recarga, por favor selecione um dos pacotes abaixo:`, {
         reply_markup: {
-            inline_keyboard: services.map((service) => {
+            inline_keyboard: services.map((service: IServices) => {
                 return [
                     {
                         text: `💰 ${service.code} ${service.description} |  R$${service.price}`,
@@ -423,7 +420,7 @@ bot.action('recarregar', async (context) => {
     context.replyWithHTML(`💵 Forma de pagamento: <b>PIX</b>
     \nPara dar início a sua recarga, por favor selecione um dos pacotes abaixo:`, {
         reply_markup: {
-            inline_keyboard: services.map((service) => {
+            inline_keyboard: services.map((service: IServices) => {
                 return [
                     {
                         text: `💰 ${service.code} ${service.description} |  R$${service.price}`,

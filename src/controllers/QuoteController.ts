@@ -7,6 +7,10 @@ export const getCias = async () => {
 
 export const getCia = async (id: string) => {
     const cias = await getCias();
+
+    console.log(cias);
+    
+
     return cias.data.companies.filter((company: ICompany) =>
         company.id == id).map((comp: ICompany) => {
             const newPoints: any[] = [];
