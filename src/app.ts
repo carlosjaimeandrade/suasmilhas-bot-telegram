@@ -1,138 +1,109 @@
 import { Telegraf } from "telegraf";
-import http from "./helpers/axios";
 
 import dotenv from 'dotenv';
-import { ICompany } from "./interfaces/ICompany";
 dotenv.config();
 
-const getCias = async () => {
-    try {
+import {
+    getCia,
+    getCias,
+    getQuoteHotmilhas,
+    getQuoteMaxmilhas
+} from "./controllers/QuoteController";
 
-        return await http.get('miles/company');
-
-    } catch (error) {
-        throw new Error('Erro ao buscar cias');
-    }
-}
-
-const getCia = async (id: string) => {
-    const cias = await getCias();
-    return cias.data.companies.filter((company: ICompany) =>
-        company.id == id).map((comp: ICompany) => {
-            const newPoints: any[] = [];
-            for (let index = comp.points[0]; index < comp.points[1]; index++) {
-                newPoints.push(`${index}`);
-            }
-            return { ...comp, points: newPoints };
-        });
-}
-
-const getQuoteHotmilhas = async (id: string, quantity: string) => {
-
-    const hot = await http.get(`/miles/${id}/${quantity}`);
-    console.log(hot);
-
-    return [
-        {
-            paymentDeadline: 1,
-            cpm: hot.data.miles["1"] / parseInt(quantity),
-            totalPrice: hot.data.miles["1"]
-        },
-        {
-            paymentDeadline: 30,
-            cpm: hot.data.miles["30"] / parseInt(quantity),
-            totalPrice: hot.data.miles["30"]
-        },
-        {
-            paymentDeadline: 60,
-            cpm: hot.data.miles["60"] / parseInt(quantity),
-            totalPrice: hot.data.miles["60"]
-        },
-        {
-            paymentDeadline: 90,
-            cpm: hot.data.miles["90"] / parseInt(quantity),
-            totalPrice: hot.data.miles["90"]
-        },
-        {
-            paymentDeadline: 120,
-            cpm: hot.data.miles["120"] / parseInt(quantity),
-            totalPrice: hot.data.miles["120"]
-        },
-        {
-            paymentDeadline: 150,
-            cpm: hot.data.miles["150"] / parseInt(quantity),
-            totalPrice: hot.data.miles["150"]
-        },
-    ];
-};
-
-const getQuoteMaxmilhas = async (id: string, quantity: string) => {
-
-    let maxID;
-
-    switch (id) {
-        case "1":
-            maxID = "gol";
-            break;
-        case "2":
-            maxID = "latam";
-            break;
-        case "3":
-            maxID = "azul";
-            break;
-        case "8":
-            maxID = "latam";
-            break;
-        default:
-            maxID = id;
-            break;
-    }
-
-    const requestMaxmilhas = await http.get(`https://bff-mall.maxmilhas.com.br/v2/hangar/miles/modality-card-info/${maxID}/${quantity}000`);
-    console.log(requestMaxmilhas);
-
-    return requestMaxmilhas.data.modalityCards.paymentScheduled.map((quote: any) => {
-        return {
-            paymentDeadline: quote.paymentDeadline,
-            cpm: quote.price,
-            totalPrice: quote.totalPrice
-        }
-    });
-};
+import { ICompany } from "./interfaces/ICompany";
+import { getUser, isRegistered } from "./controllers/UserController";
+import { getService } from "./controllers/ServiceController";
 
 const bot = new Telegraf(process.env.BOT_TOKEN as string);
 
-bot.start(async (content) => {
+bot.start(async (context) => {
+    try {
+        const from = context.update.message.from;
 
-    const from = content.update.message.from;
+        await isRegistered(context.update.message.from);
 
-    content.replyWithHTML(`
+        context.replyWithHTML(`
         Olá <b>${from.first_name}</b>! \n@SuasMilhasBot é o mais completo bot com cotações em tempo real das principais plaformas de venda de milhas do país!
-        \nNo <b>plano Free</b> você tem direito a 2 solicitações por dia.
-        \nAo se tornar um <b>membro VIP</b> você terá solicitações ilimitadas, torne-se um membro por apenas <b>R$8,99 mensais</b>.`,
-        {
-            disable_web_page_preview: true,
-            reply_markup: {
-                inline_keyboard: [
-                    [
-                        {
-                            text: 'Iniciar Cotação',
-                            callback_data: "cotar",
-                        },
-                        {
-                            text: 'Torna-se VIP',
-                            url: 'https://suasmilhas.com/assinar'
-                        }
+        \nNo <b>plano Free</b> você tem direito a 5 solicitações de cotação para testar nosso bot.
+        \nFaca uma recarga a partir de <b>R$4,99</b> e aumente o seu limite diario de solicitações, 🫵🏽 clique no botão <b>Recarregar.</b>
+        `,
+            {
+                disable_web_page_preview: true,
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            {
+                                text: 'Iniciar Cotação',
+                                callback_data: "cotar",
+                            },
+                        ],
+                        [
+                            {
+                                text: 'Ver Conta / Limite',
+                                callback_data: "conta",
+                            }
+                        ],
+                        [
+                            {
+                                text: 'Recarregar',
+                                callback_data: "recarregar",
+                            },
+                        ]
                     ]
-                ]
-            }
-        });
+                }
+            });
+    } catch (error) {
+        console.log(error);
+        context.replyWithHTML(`Desculpe, houve um erro ao iniciar o bot.`);
+    }
+});
+
+bot.action('start', async (context) => {
+    try {
+        const from = context.update.callback_query.from;
+
+        await isRegistered(context.update.callback_query.from);
+
+        context.replyWithHTML(`
+        Olá <b>${from.first_name}</b>! \n@SuasMilhasBot é o mais completo bot com cotações em tempo real das principais plaformas de venda de milhas do país!
+        \nNo <b>plano Free</b> você tem direito a 5 solicitações de cotação para testar nosso bot.
+        \nFaca uma recarga a partir de <b>R$4,99</b> e aumente o seu limite diario de solicitações, 🫵🏽 clique no botão <b>Recarregar.</b>        
+        `,
+            {
+                disable_web_page_preview: true,
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            {
+                                text: 'Iniciar Cotação',
+                                callback_data: "cotar",
+                            },
+                        ],
+                        [
+                            {
+                                text: 'Ver Conta / Limite',
+                                callback_data: "conta",
+                            }
+                        ],
+                        [
+                            {
+                                text: 'Recarregar',
+                                callback_data: "recarregar",
+                            },
+                        ]
+                    ]
+                }
+            });
+    } catch (error) {
+        console.log(error);
+        context.replyWithHTML(`Desculpe, houve um erro ao iniciar o bot.`);
+    }
 });
 
 bot.action('cotar', async (context) => {
     try {
 
-        bot.telegram.sendChatAction(`${context.chat?.id}`, "typing");
+        context.sendChatAction("typing");
 
         const cias = await getCias();
         const user = context.update.callback_query.from.first_name;
@@ -160,6 +131,7 @@ bot.action('cotar', async (context) => {
         context.answerCbQuery(`Você selecionou ${type}`);
 
     } catch (error) {
+        console.log(error);
         context.replyWithHTML(`Desculpe, houve um erro ao processar sua solicitação.`);
     }
 });
@@ -169,7 +141,7 @@ bot.action(['1', '2', '3', '8'], async (context) => {
     try {
 
         let statusBot = false;
-        context.sendChatAction("typing");        
+        context.sendChatAction("typing");
 
         switch (context.match[0]) {
 
@@ -179,7 +151,7 @@ bot.action(['1', '2', '3', '8'], async (context) => {
                 context.sendChatAction("typing");
 
                 const company = await getCia(ciaID);
-                context.sendMessage(`🚨 Para que sua cotação ocorra perfeitamente, respeite o limite mínimo e o máximo informado abaixo e veja os exemplos abaixo: 
+                context.sendMessage(`🚨 Para que sua cotação ocorra perfeitamente, respeite o limite mínimo e o máximo informado e veja os exemplos abaixo: 
                 \nLimites\n🔴 ├  MIN ${company[0].points[0]}K\n🟢 ├  MAX ${company[0].points[company[0].points.length - 1]}K
                 \nExemplos\n🫵🏽 | Tenho 65K Digite: 50\n🫵🏽 | Tenho 100K Digite: 100
                 \nDigite o total de milhas: [${company[0].points[0]} - ${company[0].points[company[0].points.length - 1]}]`);
@@ -190,7 +162,7 @@ bot.action(['1', '2', '3', '8'], async (context) => {
                         context.sendMessage("🤑 aguarde, estamos calculando...");
 
                         const quoteHotmilhas = await getQuoteHotmilhas(ciaID, context.match[0]);
-                        const quoteMaxmilhas = await getQuoteMaxmilhas(ciaID, context.match[0]);                        
+                        const quoteMaxmilhas = await getQuoteMaxmilhas(ciaID, context.match[0]);
                         context.sendChatAction("typing");
                         context.replyWithHTML(`
                         ✈️ | Companhia Aérea: <b>Smiles</b>\n💵 | Plaforma: <b>HotMilhas</b>
@@ -209,6 +181,10 @@ bot.action(['1', '2', '3', '8'], async (context) => {
                                         {
                                             text: 'Iniciar Nova Cotação',
                                             callback_data: "cotar",
+                                        },
+                                        {
+                                            text: 'Voltar',
+                                            callback_data: "start",
                                         }
                                     ]
                                 ], resize_keyboard: true
@@ -216,7 +192,8 @@ bot.action(['1', '2', '3', '8'], async (context) => {
                         });
                     }
                     statusBot = false;
-                });                
+                });
+
                 break;
 
             case '2':
@@ -225,7 +202,7 @@ bot.action(['1', '2', '3', '8'], async (context) => {
                 context.sendChatAction("typing");
 
                 const company2 = await getCia(ciaID2);
-                context.sendMessage(`🚨 Para que sua cotação ocorra perfeitamente, respeite o limite mínimo e o máximo informado abaixo e veja os exemplos abaixo: 
+                context.sendMessage(`🚨 Para que sua cotação ocorra perfeitamente, respeite o limite mínimo e o máximo informado e veja os exemplos abaixo: 
                 \nLimites\n🔴 ├  MIN ${company2[0].points[0]}K\n🟢 ├  MAX ${company2[0].points[company2[0].points.length - 1]}K
                 \nExemplos\n🫵🏽 | Tenho 65K Digite: 50\n🫵🏽 | Tenho 100K Digite: 100
                 \nDigite o total de milhas: [${company2[0].points[0]} - ${company2[0].points[company2[0].points.length - 1]}]`);
@@ -272,7 +249,7 @@ bot.action(['1', '2', '3', '8'], async (context) => {
                 context.sendChatAction("typing");
 
                 const company3 = await getCia(ciaID3);
-                context.sendMessage(`🚨 Para que sua cotação ocorra perfeitamente, respeite o limite mínimo e o máximo informado abaixo e veja os exemplos abaixo: 
+                context.sendMessage(`🚨 Para que sua cotação ocorra perfeitamente, respeite o limite mínimo e o máximo informado e veja os exemplos abaixo: 
                 \nLimites\n🔴 ├  MIN ${company3[0].points[0]}K\n🟢 ├  MAX ${company3[0].points[company3[0].points.length - 1]}K
                 \nExemplos\n🫵🏽 | Tenho 65K Digite: 50\n🫵🏽 | Tenho 100K Digite: 100
                 \nDigite o total de milhas: [${company3[0].points[0]} - ${company3[0].points[company3[0].points.length - 1]}]`);
@@ -319,7 +296,7 @@ bot.action(['1', '2', '3', '8'], async (context) => {
                 context.sendChatAction("typing");
 
                 const company4 = await getCia(ciaID4);
-                context.sendMessage(`🚨 Para que sua cotação ocorra perfeitamente, respeite o limite mínimo e o máximo informado abaixo e veja os exemplos abaixo: 
+                context.sendMessage(`🚨 Para que sua cotação ocorra perfeitamente, respeite o limite mínimo e o máximo informado e veja os exemplos abaixo: 
                 \nLimites\n🔴 ├  MIN ${company4[0].points[0]}K\n🟢 ├  MAX ${company4[0].points[company4[0].points.length - 1]}K
                 \nExemplos\n🫵🏽 | Tenho 65K Digite: 50\n🫵🏽 | Tenho 100K Digite: 100
                 \nDigite o total de milhas: [${company4[0].points[0]} - ${company4[0].points[company4[0].points.length - 1]}]`);
@@ -362,14 +339,100 @@ bot.action(['1', '2', '3', '8'], async (context) => {
 
             default:
                 context.replyWithHTML(`🫣<b>Desculpe ${context.from?.first_name}</b>, houve um erro ao processar sua solicitação, tente novamente.`);
+                statusBot = false;
                 break;
-        }        
+        }
 
     } catch (error) {
+        console.log(error);
         context.sendChatAction('typing');
         context.sendMessage(`🚨 Desculpe, houve um erro ao processar sua solicitação.`);
     }
 
 });
+
+bot.command('conta', async (context) => {
+    context.sendChatAction('typing');
+    context.deleteMessage();
+
+    const user = await getUser(context.update.message.from);
+
+    context.sendMessage(`👤 Dados do Usuário
+    \n🆔 | ID: ${user[0].userId}
+    \n🫡 | Nome: ${user[0].first_name}\n💻 | Username: ${user[0].username}
+    \n💎 | Membro Vip: ${user[0].is_Vip ? "Sim" : "Não"}\n🤑 | Saldo: ${user[0].balance}\n🔎 | Consultas: ${user[0].requests}
+    `, {
+        reply_markup: {
+            inline_keyboard: [
+                [
+                    {
+                        text: 'Voltar',
+                        callback_data: "start",
+                    },
+                ]
+            ], resize_keyboard: true, one_time_keyboard: true
+        }
+    });
+});
+
+bot.action('conta', async (context) => {
+    context.sendChatAction('typing');
+
+    const user = await getUser(context.update.callback_query.from);
+
+    context.sendMessage(`👤 Dados do Usuário
+    \n🆔 | ID: ${user[0].userId}
+    \n🫡 | Nome: ${user[0].first_name}\n💻 | Username: ${user[0].username}
+    \n💎 | Membro Vip: ${user[0].is_Vip ? "Sim" : "Não"}\n🤑 | Saldo: ${user[0].balance}\n🔎 | Consultas: ${user[0].requests}
+    `, {
+        reply_markup: {
+            inline_keyboard: [
+                [
+                    {
+                        text: 'Voltar',
+                        callback_data: "start",
+                    },
+                ]
+            ], resize_keyboard: true,
+            one_time_keyboard: true
+        }
+    });
+});
+
+bot.command('recarregar', async (context) => {
+    const services = await getService();
+
+    context.replyWithHTML(`💵 Forma de pagamento: <b>PIX</b>
+    \nPara dar início a sua recarga, por favor selecione um dos pacotes abaixo:`, {
+        reply_markup: {
+            inline_keyboard: services.map((service) => {
+                return [
+                    {
+                        text: `💰 ${service.code} ${service.description} |  R$${service.price}`,
+                        callback_data: service.code
+                    }
+                ]
+            })
+        }
+    });
+});
+
+bot.action('recarregar', async (context) => {
+    const services = await getService();
+
+    context.replyWithHTML(`💵 Forma de pagamento: <b>PIX</b>
+    \nPara dar início a sua recarga, por favor selecione um dos pacotes abaixo:`, {
+        reply_markup: {
+            inline_keyboard: services.map((service) => {
+                return [
+                    {
+                        text: `💰 ${service.code} ${service.description} |  R$${service.price}`,
+                        callback_data: service.code
+                    }
+                ]
+            })
+        }
+    });
+})
 
 bot.launch();

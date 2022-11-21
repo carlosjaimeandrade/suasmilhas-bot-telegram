@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String  @id @default(uuid())
+  userId     Int?
+  first_name String?
+  username   String?
+  is_Vip     Boolean @default(false)
+  is_bot     Boolean @default(false)
+  language   String?
+  balance    Float
+  requests   Int
+
+  status     Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  Order Order[]
+
+  @@map("users")
+}
+
+model Service {
+  id           String @id @default(uuid())
+  code         String
+  description  String
+  price        Float
+  priceperUnit Float
+
+  status     Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  Order Order[]
+
+  @@map("services")
+}
+
+model Order {
+  id         String @id @default(uuid())
+  userId     String
+  servicesId String
+  quantity   Int
+
+  status     Boolean  @default(false)
+  created_at DateTime @default(now())
+  update_at  DateTime @default(now()) @updatedAt
+
+  user     User    @relation(fields: [userId], references: [id])
+  services Service @relation(fields: [servicesId], references: [id])
+
+  @@map("orders")
+}
